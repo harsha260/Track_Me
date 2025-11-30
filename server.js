@@ -9,11 +9,11 @@ const axios = require('axios');
 // --- CONFIGURATION ---
 const UPLOAD_PATH = '/tmp/';
 
-// 1. CHANGE THIS to something unique (like a password)
+// 1. TOPIC
 const NTFY_TOPIC = 'harsha_notefs'; 
 
-// 2. CHANGE THIS to your actual Render App URL
-const APP_URL = 'https://track-me-gvug.onrender.com/'; 
+// 2. APP URL (Removed the trailing slash to fix broken links)
+const APP_URL = 'https://track-me-gvug.onrender.com'; 
 
 // Multer Storage Engine
 const storage = multer.diskStorage({
@@ -46,16 +46,18 @@ async function sendNtfyNotification() {
             "Tap to listen to the new voice note.", 
             {
                 headers: {
-                    'Title': '🎙️ New Audio from Kiosk',
-                    'Tags': 'microphone,loudspeaker', // Emojis/Tags
-                    'Click': `${APP_URL}/listen`, // Opens this URL on tap
-                    'Actions': `view, Listen, ${APP_URL}/listen` // Adds a button
+                    // FIXED: Removed Emoji from Title to prevent Node.js Header Error
+                    'Title': 'New Audio from Kiosk', 
+                    'Tags': 'microphone,loudspeaker', // This adds the icons automatically
+                    'Click': `${APP_URL}/listen`, 
+                    'Actions': `view, Listen, ${APP_URL}/listen` 
                 }
             }
         );
         console.log(`✅ Notification sent to ntfy.sh/${NTFY_TOPIC}`);
     } catch (error) {
-        console.error("❌ Notification failed:", error.message);
+        // Log the full error to help debugging
+        console.error("❌ Notification failed:", error.response ? error.response.data : error.message);
     }
 }
 
@@ -93,7 +95,6 @@ app.post('/upload-audio', upload.single('voiceNote'), (req, res) => {
 });
 
 // 3. ENDPOINT: Listen to Audio
-// We use sendFile instead of download so it plays in the browser
 app.get('/listen', (req, res) => {
     const filePath = path.join(UPLOAD_PATH, 'latest_msg.wav');
     
