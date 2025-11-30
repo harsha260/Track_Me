@@ -47,7 +47,7 @@ async function sendNtfyNotification() {
             {
                 headers: {
                     // FIXED: Removed Emoji from Title to prevent Node.js Header Error
-                    'Title': 'New Audio from Kiosk', 
+                    'Title': 'New Audio', 
                     'Tags': 'microphone,loudspeaker', // This adds the icons automatically
                     'Click': `${APP_URL}/listen`, 
                     'Actions': `view, Listen, ${APP_URL}/listen` 
