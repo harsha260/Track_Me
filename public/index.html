@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Family Link</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes"> <!-- Fullscreen on iOS -->
+  <style>
+    body {
+      background-color: #1a1a1a;
+      color: white;
+      font-family: 'Helvetica Neue', sans-serif;
+      text-align: center;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #top-bar {
+      padding: 20px;
+      font-size: 24px;
+      background: #333;
+    }
+    #distance-box {
+      font-size: 80px;
+      font-weight: bold;
+      margin-top: 40px;
+      color: #4CAF50; /* Green */
+    }
+    #message-box {
+      font-size: 40px;
+      margin: 40px 20px;
+      padding: 30px;
+      border: 4px solid #555;
+      border-radius: 20px;
+      background: #222;
+    }
+    #alert-box {
+      display: none; /* Hidden by default */
+      background-color: red;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 100px;
+      font-weight: bold;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    
+    /* Simple Button for Audio */
+    .btn {
+      padding: 20px;
+      font-size: 24px;
+      background: #2196F3;
+      border: none;
+      color: white;
+      border-radius: 10px;
+      width: 80%;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="alert-overlay" style="display:none; background:red; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99; display:flex; justify-content:center; align-items:center; font-size:5em; font-weight:bold;">
+    ALERT!
+  </div>
+
+  <div id="top-bar">FAMILY CONNECTION</div>
+
+  <div id="distance-box">Loading...</div>
+  <div style="color:#888;">Distance from Home</div>
+
+  <div id="message-box">Wait...</div>
+  <div style="font-size: 20px; color: #aaa;" id="time-box">Last update: --</div>
+
+  <!-- NATIVE HTML AUDIO RECORDING -->
+  <!-- This works on almost all old iOS versions -->
+  <div style="margin-top: auto; padding-bottom: 40px;">
+    <p>Send Voice Note:</p>
+    <input type="file" accept="audio/*" capture style="font-size: 20px;">
+  </div>
+
+  <script>
+    // The Polling Logic
+    setInterval(async () => {
+      try {
+        const response = await fetch('/status');
+        const data = await response.json();
+
+        // Update Text
+        document.getElementById('distance-box').innerText = data.distance + " km";
+        document.getElementById('message-box').innerText = data.message;
+        document.getElementById('time-box').innerText = "Last update: " + data.timestamp;
+
+        // Handle Alerts
+        const alertOverlay = document.getElementById('alert-overlay');
+        if (data.isAlert) {
+            alertOverlay.style.display = 'flex';
+        } else {
+            alertOverlay.style.display = 'none';
+        }
+      } catch (e) {
+        console.log("Connection error");
+      }
+    }, 5000); // Check every 5 seconds
+  </script>
+</body>
+</html>
