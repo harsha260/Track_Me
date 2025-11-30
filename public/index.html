@@ -3,60 +3,89 @@
 <head>
   <title>Family Link</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="apple-mobile-web-app-capable" content="yes"> 
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
   <style>
-    body { background-color: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-    #top-bar { padding: 20px; font-size: 24px; background: #333; }
-    #distance-box { font-size: 80px; font-weight: bold; margin-top: 40px; color: #4CAF50; }
-    #message-box { font-size: 40px; margin: 20px; padding: 30px; border: 4px solid #555; border-radius: 20px; background: #222; }
-    #alert-overlay { display: none; background: red; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 99; justify-content: center; align-items: center; font-size: 5em; font-weight: bold; animation: blink 1s infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
+    body { background-color: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;}
+    #top-bar { padding: 15px; font-size: 20px; background: #333; display: flex; justify-content: space-between; align-items: center;}
     
-    /* Audio Button Styling */
-    .file-upload { display: inline-block; padding: 20px 40px; font-size: 24px; background: #2196F3; color: white; border-radius: 10px; cursor: pointer; margin-top: auto; margin-bottom: 40px; }
+    /* Layout split: Message top, Map bottom */
+    #content-area { flex: 1; display: flex; flex-direction: column; padding: 10px; }
+    
+    #message-box { font-size: 30px; padding: 20px; background: #222; border-radius: 15px; border: 2px solid #444; margin-bottom: 10px; }
+    #time-box { font-size: 14px; color: #888; margin-bottom: 10px; }
+
+    /* MAP CONTAINER */
+    #map { flex: 1; border-radius: 15px; width: 100%; min-height: 200px; z-index: 1;}
+
+    /* Alert Overlay */
+    #alert-overlay { display: none; background: red; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 999; justify-content: center; align-items: center; font-size: 5em; font-weight: bold; animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Audio Button */
+    .file-upload { display: block; width: 100%; padding: 15px; background: #2196F3; color: white; font-size: 20px; border: none; text-align: center; cursor: pointer; }
   </style>
 </head>
 <body>
-  <div id="alert-overlay">ALERT!</div>
-  <div id="top-bar">FAMILY CONNECTION</div>
 
-  <div id="distance-box">Loading...</div>
-  <div style="color:#888;">Distance from Home</div>
+  <div id="alert-overlay" onclick="this.style.display='none'">ALERT!</div>
+  
+  <div id="top-bar">
+    <span>FAMILY DASHBOARD</span>
+    <span id="dist-display" style="color:#4CAF50;">-- km</span>
+  </div>
 
-  <div id="message-box">Wait...</div>
-  <div style="font-size: 20px; color: #aaa;" id="time-box">Last update: --</div>
+  <div id="content-area">
+    <div id="message-box">Initializing...</div>
+    <div id="time-box">Last update: --</div>
+    
+    <div id="map"></div>
+  </div>
 
-  <!-- Audio Upload Form -->
-  <form id="audioForm" enctype="multipart/form-data">
-    <label for="voiceNote" class="file-upload">
-        🎙️ Send Voice Note
-    </label>
-    <input type="file" id="voiceNote" name="voiceNote" accept="audio/*" capture style="display:none;" onchange="uploadAudio()">
+  <form id="audioForm">
+    <label for="voiceNote" class="file-upload">🎙️ Send Voice Note</label>
+    <input type="file" id="voiceNote" accept="audio/*" capture style="display:none;" onchange="uploadAudio()">
   </form>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <script>
-    // Polling Logic
+    // Initialize Map
+    // Default view: 0,0 until we get real data
+    var map = L.map('map').setView([0, 0], 2); 
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    var marker = L.marker([0, 0]).addTo(map);
+
     setInterval(async () => {
       try {
         const response = await fetch('/status');
         const data = await response.json();
-        document.getElementById('distance-box').innerText = data.distance + " km";
+        
+        // Update Text
         document.getElementById('message-box').innerText = data.message;
         document.getElementById('time-box').innerText = "Last update: " + data.timestamp;
+        document.getElementById('dist-display').innerText = data.distance ? data.distance + " km" : "";
         document.getElementById('alert-overlay').style.display = data.isAlert ? 'flex' : 'none';
+
+        // Update Map if we have valid coordinates
+        if (data.lat && data.lon && data.lat !== 0) {
+            var newLatLng = new L.LatLng(data.lat, data.lon);
+            marker.setLatLng(newLatLng);
+            map.flyTo(newLatLng, 15); // Zoom level 15
+        }
+
       } catch (e) { console.log("Connection error"); }
     }, 5000);
 
-    // Audio Upload Logic
     async function uploadAudio() {
         const input = document.getElementById('voiceNote');
         const formData = new FormData();
         formData.append('voiceNote', input.files[0]);
-        
         document.getElementById('message-box').innerText = "Sending Audio...";
-        
         await fetch('/upload-audio', { method: 'POST', body: formData });
-        
         document.getElementById('message-box').innerText = "Audio Sent!";
         setTimeout(() => { document.getElementById('message-box').innerText = "Ready"; }, 2000);
     }
