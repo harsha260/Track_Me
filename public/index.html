@@ -3,83 +3,110 @@
 <head>
   <title>Family Link</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
   <style>
-    body { background-color: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;}
-    #top-bar { padding: 15px; font-size: 20px; background: #333; display: flex; justify-content: space-between; align-items: center;}
+    body { background-color: #111; color: white; font-family: sans-serif; text-align: center; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;}
     
-    /* Layout split: Message top, Map bottom */
-    #content-area { flex: 1; display: flex; flex-direction: column; padding: 10px; }
-    
-    #message-box { font-size: 30px; padding: 20px; background: #222; border-radius: 15px; border: 2px solid #444; margin-bottom: 10px; }
-    #time-box { font-size: 14px; color: #888; margin-bottom: 10px; }
+    /* Header Grid: Title Left, Weather Right */
+    #top-bar { padding: 15px; background: #222; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333;}
+    .weather-widget { text-align: right; font-size: 14px; color: #aaa; }
+    .weather-temp { font-size: 24px; color: #fff; font-weight: bold; }
 
-    /* MAP CONTAINER */
-    #map { flex: 1; border-radius: 15px; width: 100%; min-height: 200px; z-index: 1;}
+    #content-area { flex: 1; display: flex; flex-direction: column; padding: 10px; position: relative;}
+    
+    /* Status Box */
+    #message-box { font-size: 32px; padding: 20px; background: #1a1a1a; border-radius: 15px; border: 1px solid #333; margin-bottom: 10px; font-weight: bold; letter-spacing: 1px;}
+    #time-box { font-size: 14px; color: #666; margin-bottom: 10px; }
+
+    /* Map */
+    #map { flex: 1; border-radius: 15px; width: 100%; min-height: 200px; z-index: 1; border: 1px solid #333;}
+
+    /* Controls at bottom */
+    #controls { padding: 10px; display: flex; gap: 10px; background: #222; }
+    .btn { flex: 1; padding: 15px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; color: white; }
+    .btn-audio { background: #2196F3; }
+    .btn-text { background: #4caf50; }
 
     /* Alert Overlay */
-    #alert-overlay { display: none; background: red; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 999; justify-content: center; align-items: center; font-size: 5em; font-weight: bold; animation: blink 1s infinite; }
+    #alert-overlay { display: none; background: #d32f2f; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 999; justify-content: center; align-items: center; font-size: 4em; font-weight: bold; animation: blink 1s infinite; text-transform: uppercase;}
     @keyframes blink { 50% { opacity: 0; } }
-
-    /* Audio Button */
-    .file-upload { display: block; width: 100%; padding: 15px; background: #2196F3; color: white; font-size: 20px; border: none; text-align: center; cursor: pointer; }
   </style>
 </head>
 <body>
 
-  <div id="alert-overlay" onclick="this.style.display='none'">ALERT!</div>
+  <div id="alert-overlay" onclick="this.style.display='none'">🚨 ALERT 🚨</div>
   
   <div id="top-bar">
-    <span>FAMILY DASHBOARD</span>
-    <span id="dist-display" style="color:#4CAF50;">-- km</span>
+    <div style="font-size: 20px; font-weight: bold;">FAMILY DASHBOARD</div>
+    <div class="weather-widget">
+        <div class="weather-temp" id="weather-temp">--°C</div>
+        <div id="weather-desc">Loading...</div>
+    </div>
   </div>
 
   <div id="content-area">
     <div id="message-box">Initializing...</div>
     <div id="time-box">Last update: --</div>
-    
     <div id="map"></div>
   </div>
 
-  <form id="audioForm">
-    <label for="voiceNote" class="file-upload">🎙️ Send Voice Note</label>
-    <input type="file" id="voiceNote" accept="audio/*" capture style="display:none;" onchange="uploadAudio()">
-  </form>
+  <div id="controls">
+      <form id="audioForm" style="display:none;">
+          <input type="file" id="voiceNote" accept="audio/*" capture onchange="uploadAudio()">
+      </form>
+      
+      <button class="btn btn-audio" onclick="document.getElementById('voiceNote').click()">🎙️ Voice</button>
+      <button class="btn btn-text" onclick="sendQuickText()">💬 Text Phone</button>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
   <script>
-    // Initialize Map
-    // Default view: 0,0 until we get real data
+    // --- SETTINGS ---
+    // SET YOUR HOME LOCATION HERE FOR WEATHER
+    const HOME_LAT = 17.6868; 
+    const HOME_LON = 83.2185; 
+
+    // Initialize Map with Dark Mode
     var map = L.map('map').setView([0, 0], 2); 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CartoDB',
+        subdomains: 'abcd',
+        maxZoom: 19
     }).addTo(map);
     var marker = L.marker([0, 0]).addTo(map);
 
+    // Weather Function
+    async function fetchWeather() {
+        try {
+            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${HOME_LAT}&longitude=${HOME_LON}&current_weather=true`);
+            const data = await res.json();
+            document.getElementById('weather-temp').innerText = Math.round(data.current_weather.temperature) + "°C";
+            // Simple code to text mapping could go here, for now just 'Wind'
+            document.getElementById('weather-desc').innerText = "Wind: " + data.current_weather.windspeed + "km/h";
+        } catch(e) {}
+    }
+    fetchWeather();
+    setInterval(fetchWeather, 600000); // Update weather every 10 mins
+
+    // Polling System
     setInterval(async () => {
       try {
         const response = await fetch('/status');
         const data = await response.json();
         
-        // Update Text
         document.getElementById('message-box').innerText = data.message;
         document.getElementById('time-box').innerText = "Last update: " + data.timestamp;
-        document.getElementById('dist-display').innerText = data.distance ? data.distance + " km" : "";
         document.getElementById('alert-overlay').style.display = data.isAlert ? 'flex' : 'none';
 
-        // Update Map if we have valid coordinates
         if (data.lat && data.lon && data.lat !== 0) {
             var newLatLng = new L.LatLng(data.lat, data.lon);
             marker.setLatLng(newLatLng);
-            map.flyTo(newLatLng, 15); // Zoom level 15
+            map.flyTo(newLatLng, 15);
         }
-
       } catch (e) { console.log("Connection error"); }
     }, 5000);
 
+    // Upload Audio
     async function uploadAudio() {
         const input = document.getElementById('voiceNote');
         const formData = new FormData();
@@ -87,7 +114,19 @@
         document.getElementById('message-box').innerText = "Sending Audio...";
         await fetch('/upload-audio', { method: 'POST', body: formData });
         document.getElementById('message-box').innerText = "Audio Sent!";
-        setTimeout(() => { document.getElementById('message-box').innerText = "Ready"; }, 2000);
+    }
+
+    // Send Quick Text
+    async function sendQuickText() {
+        let text = prompt("Enter short message for phone:");
+        if (text) {
+            await fetch('/send-text', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: text})
+            });
+            alert("Sent!");
+        }
     }
   </script>
 </body>
